@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>vue双向数据绑定</title>
+</head>
+<body>
+	<div id="app">
+        <h2>{{title}}</h2>
+        <input v-model="name">
+        <h1>{{name}}</h1>
+        <button v-on:click="clickMe">click me!</button>
+    </div>
+	<script>
+		// var data = {name: 'sx'};
+		// observe(data);
+		// data.name = 'songstar';
+		function Vue(options){
+			this.options = options;
+			this.data = options.data, self = this;
+			Object.keys(this.data).forEach(function(key){
+				self.proxy(key);
+			});
+			observe(this.data, this);
+			this.compile = new Compile(options.el || document.body, this);
+		}
+		Vue.prototype = {
+			proxy: function(key){
+				var self = this;
+				Object.defineProperty(self, key, {
+					configurable: false,
+					enumerable: true,
+					get: function (){
+						return self.data[key];
+					},
+					set: function(val){
+						self.data[key] = val;
+					}
+				})
+			}
+		}
+		function observe(data){
+			if(!data || typeof data !== 'object'){
+				return ;
+			}
+			Object.keys(data).forEach(function(key){
+				defineReactive(data, key, data[key]);
+			});
+		}
+		function defineReactive(data, key, val){
+			observe(val);
+			var dep = new Dep();
+			Object.defineProperty(data, key, {
+				enumerable: true, // 可枚举
+				configurable: false, // 不能再define
+				get: function(){
+					console.log('a', Dep.target)
+					Dep.target && dep.addDep(Dep.target);
+					return val;
+				},
+				set: function(newVal){
+					console.log('监听成功', val + '-->' + newVal);
+					val = newVal;
+					dep.notify();
+				}
+			})
+		}
+		function Dep(){
+			this.subs = [];
+		}
+		Dep.prototype = {
+			addDep: function (sub){
+				this.subs.push(sub);
+			},
+			notify: function(){
+				console.log(this.subs)
+				this.subs.forEach(function(sub){
+					sub.update();
+				})
+			}
+		}
+		Dep.target = null;
+
+		function Watcher(vm, exp, fn){
+			this.fn = fn;
+			this.vm = vm;
+			this.exp = exp;
+			this.value = this.get();
+			console.log('fn=' + fn)
+			if (typeof fn == 'function') {
+				this.getter = fn
+			}
+		}
+		Watcher.prototype = {
+			update: function() {
+				this.run(); // 属性值变化收到通知
+			},
+			get: function() {
+				Dep.target = this;
+				var value = this.vm[this.exp];
+				Dep.target = null;
+				return value;
+			},
+			run: function() {
+				var value = this.get();
+				var oldVal = this.value;
+				if (value !== oldVal) {
+					this.value = value;
+					this.cb.call(this.vm, value, oldVal);
+				}
+			}
+		}
+
+
+		function Compile(el, vm){
+			console.log(this)
+			this.vm = vm;
+			this.$el = this.isElementNode(el) ? el : document.querySelector(el);
+			if(this.$el){
+				this.fragment = this.nodeFragment(this.$el);
+				this.init();
+				this.$el.appendChild(this.fragment);
+			}
+		}
+		Compile.prototype = {
+			init: function (){
+				this.compileElement(this.fragment);
+			},
+			nodeFragment: function(el){
+				var fragment = document.createDocumentFragment(), child;
+				while (child = el.firstChild) {
+					fragment.appendChild(child)
+				}
+				return fragment;
+			},
+			compileText: function(node, exp) {
+				compileUtil.text(node, this.vm, exp);
+			},
+			isDirective: function(attr) {
+				return attr.indexOf('v-') == 0;
+			},			
+			isEventDirective: function(dir) {
+				return dir.indexOf('on') === 0;
+			},
+			isElementNode: function(node) {
+                return node.nodeType == 1;
+            },
+        	isTextNode: function(node) {
+                return node.nodeType == 3;
+            },
+			compileElement: function(el){
+				var childNodes = el.childNodes, self = this;
+				console.log(childNodes);
+				[].slice.call(childNodes).forEach(function(node){
+					var text = node.textContent,
+					    reg = /\{\{(.*)\}\}/;
+					if (self.isElementNode(node)) {
+						self.compile(node);
+					} else if (self.isTextNode(node) && reg.test(text)) {
+						// console.log(node, RegExp.$1);
+						self.compileText(node, RegExp.$1);
+					}
+					// 遍历编译子节点
+					if (node.childNodes && node.childNodes.length) {
+						self.compileElement(node);
+					}
+				})
+			},
+			compile: function(node){
+				var nodeAttrs = node.attributes, self = this;
+				console.log(node);
+				[].slice.call(nodeAttrs).forEach(function(attr){
+					// 规定v-xx指令
+					var attrName = attr.name;
+					console.log(attrName)
+					if (self.isDirective(attrName)) {
+						var exp = attr.value;
+						console.log(exp)
+						var dir = attrName.substring(2); //text/model...
+						if (self.isEventDirective(dir)) {
+							// 事件指令 如v-on:click
+							compileUtil.eventHandler(node, self.vm, exp, dir);
+						} else {
+							// 暂时只做v-text,v-model
+							compileUtil[dir] && compileUtil[dir](node, self.vm, exp);
+						}
+					}
+				})
+			}
+		};
+		// 指令处理集合
+		var compileUtil = {
+			text: function(node, vm, exp) {
+				console.log(node, vm, exp)
+				this.bind(node, vm, exp, 'text');
+			},
+			model: function(node, vm, exp) {
+				this.bind(node, vm, exp, 'model');
+			},
+			// 事件处理
+			eventHandler: function(node, vm, exp, dir) {
+				var eventType = dir.split(':')[1],
+				    fn = vm.options.methods && vm.options.methods[exp];
+				    console.log('vm:  '+ vm.options.methods[exp])
+				if (eventType && fn) {
+					node.addEventListener(eventType, fn.bind(vm), false);
+				}
+			},
+			bind: function(node, vm, exp, dir){
+				console.log('dir=' +dir, 'vm='+vm)
+				var updaterFn = updater[dir + 'Updater'];
+				// 第一次初始化视图
+				updaterFn && updaterFn(node, vm[exp]);
+				new Watcher(vm, exp, function(val, oldVal){
+					updaterFn && updaterFn(node, val, oldVal);
+				})
+			}
+		};
+		var updater = {
+			textUpdater: function(node, val){
+				node.textContent = typeof val == 'undefined' ? '' : val;
+			},
+			modelUpdater: function(node, val, oldVal) {
+				node.value = typeof val == 'undefined' ? '' : val;
+			}
+		}
+		new Vue({
+        el: '#app',
+        data: {
+            title: 'hello world',
+            name: 'canfoo'
+        },
+        methods: {
+            clickMe: function () {
+                this.title = 'hello world';
+            }
+        },
+        mounted: function () {
+            window.setTimeout(() => {
+                this.title = '你好';
+            }, 1000);
+        }
+    });
+	</script>
+</body>
+</html>
