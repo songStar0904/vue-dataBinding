@@ -1,4 +1,10 @@
-
+/**
+ * @Author   songStar
+ * @DateTime 2017-10-27
+ * @version  v1.0
+ * @param    {[type]}
+ * @return   {[type]}
+ */
 function observe(data){
 	if(!data || typeof data !== 'object'){
 		return ;
@@ -21,6 +27,7 @@ function defineReactive(data, key, val){
 			console.log('监听成功', val + '-->' + newVal);
 			val = newVal;
 			dep.notify();
+			console.log(dep)
 		}
 	})
 }
@@ -29,12 +36,12 @@ function Dep(){
 }
 Dep.prototype = {
 	addDep: function (sub){
-		this.subs[0] = (sub);
+		this.subs[0] = sub
 	},
 	notify: function(){
-		console.log(this.subs)
 		this.subs.forEach(function(sub){
 			sub.update();
+			console.log(sub)
 		})
 	},
 	removeSub: function(sub){

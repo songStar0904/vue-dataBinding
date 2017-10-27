@@ -1,10 +1,16 @@
-
+/**
+ * @Author   songStar
+ * @DateTime 2017-10-27
+ * @version  v1.0
+ * @param    {[type]}
+ * @param    {[type]}
+ * @param    {Function}
+ */
 function Watcher(vm, exp, fn){
 	this.fn = fn;
 	this.vm = vm;
 	this.exp = exp;
 	this.value = this.get();
-	console.log('fn=' + fn)
 	if (typeof fn == 'function') {
 		this.getter = fn
 	}
