@@ -31,24 +31,24 @@ function defineReactive(data, key, val){
 		}
 	})
 }
-function Dep(){
-	this.subs = [];
-}
-Dep.prototype = {
-	addDep: function (sub){
+class Dep {
+	constructor () {
+		this.subs = []
+	}
+	addDep (sub) {
 		this.subs[0] = sub
-	},
-	notify: function(){
-		this.subs.forEach(function(sub){
-			sub.update();
+	}
+	removeSub (sub) {
+		let index =  this.subs.indexOf(sub)
+		if (index !== -1) {
+			this.subs.splice(index, 1)
+		}
+	}
+	notify () {
+		this.subs.forEach(sub => {
+			sub.update()
 			console.log(sub)
 		})
-	},
-	removeSub: function(sub){
-		var index = this.subs.indexOf(sub);
-		if (index !== -1) {
-			this.subs.splice(index, 1);
-		}
 	}
 }
 Dep.target = null;
